@@ -27,10 +27,32 @@ services:
       timeout: 10s   # Health check command times out after 10 seconds
       retries: 3     # Retry up to 3 times if health check fails
       start_period: 40s  # Wait 40 seconds after container start before beginning health checks
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      
+      # HTTP ROUTER (redirect to HTTPS)
+      - "traefik.http.routers.litellm.entrypoints=web"
+      - "traefik.http.routers.litellm.rule=Host(`litellm.h34.co`)"
+      - "traefik.http.routers.litellm.middlewares=litellm-https-redirect"
+      
+      # HTTPS ROUTER
+      - "traefik.http.routers.litellm-secure.entrypoints=websecure"
+      - "traefik.http.routers.litellm-secure.rule=Host(`litellm.h34.co`)"
+      - "traefik.http.routers.litellm-secure.tls=true"
+      - "traefik.http.routers.litellm-secure.tls.certresolver=cloudflare"
+      
+      # MIDDLEWARE: HTTPS Redirect
+      - "traefik.http.middlewares.litellm-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.litellm-https-redirect.redirectscheme.permanent=true"
+      
+      # SERVICE (backend configuration)
+      - "traefik.http.services.litellm.loadbalancer.server.port=4000"
+      - "traefik.http.services.litellm.loadbalancer.server.scheme=http"
 
   db:
     image: postgres:16
-    restart: always
+    restart: unless-stopped
     container_name: litellm_db
     environment:
       POSTGRES_DB: litellm
@@ -39,7 +61,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data # Persists Postgres data across container restarts
+      - /home/teez/docker-volumes/litellm/postgres_data:/var/lib/postgresql/data # Persists Postgres data across container restarts
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -d litellm -U llmproxy"]
       interval: 1s
@@ -49,7 +71,7 @@ services:
   prometheus:
     image: prom/prometheus
     volumes:
-      - prometheus_data:/prometheus
+      - /home/teez/docker-volumes/litellm/prometheus_data:/prometheus
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
       - "9090:9090"
@@ -57,10 +79,4 @@ services:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
       - "--storage.tsdb.retention.time=15d"
-    restart: always
-
-volumes:
-  prometheus_data:
-    driver: local
-  postgres_data:
-    name: litellm_postgres_data # Named volume for Postgres data persistence
+    restart: unless-stopped
