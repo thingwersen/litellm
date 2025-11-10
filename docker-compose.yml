@@ -41,6 +41,9 @@ services:
       - "traefik.http.routers.litellm-secure.rule=Host(`litellm.h34.co`)"
       - "traefik.http.routers.litellm-secure.tls=true"
       - "traefik.http.routers.litellm-secure.tls.certresolver=cloudflare"
+
+      # WHITELIST
+      - "traefik.http.routers.litellm-secure.middlewares=app-whitelist@file"
       
       # MIDDLEWARE: HTTPS Redirect
       - "traefik.http.middlewares.litellm-https-redirect.redirectscheme.scheme=https"
